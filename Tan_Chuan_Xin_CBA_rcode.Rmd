@@ -1,0 +1,469 @@
+---
+title: "Tan_Chuan_Xin_CBA_rcode"
+author: "tanchuanxin"
+date: "11/7/2021"
+output: html_document
+---
+
+# Setup 
+In this chunk, we will set up the R libraries necessary for this assignment. Also, we will read in the data from `premium2.csv` as a data table and perform a quick check on the first few rows of the data to ensure we have read it in successfully 
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+
+# set your working directory here
+setwd("C:/Users/user/Documents/Github/re6013_assignment") # chuanxin's wd
+```
+
+``` {r read data}
+# read in data
+premium2.dt <- fread("premium2.csv")
+
+
+# check data
+dim(premium2.dt)
+head(premium2.dt)
+summary(premium2.dt)
+```
+
+# Question 1
+<b>Create the BMI variable based on CDC definition from https://www.cdc.gov/healthyweight/assessing/index.html. Show your code.</b>
+
+From the website, `BMI is a person’s weight in kilograms divided by the square of height in meters`. We shall implement this formula to create the BMI variable. 
+
+We reference Appendix A of `CBA Question Paper.pdf` and see that the `Height` variable is given in cm, while the `Weight` variable is given in kg. Therefore, we will have to perform some conversion for the height variable before using it. 
+
+The formula is therefore `BMI = Weight / (Height/100)^2`. We will keep BMI as a variable type of Double because the decimal points are important. However, we will round off to just one decimal point.
+
+``` {r question_1}
+# create the BMI variable
+premium2.dt$BMI <- round(premium2.dt$Weight / ((premium2.dt$Height/100)^2), 1)
+
+
+# check data
+dim(premium2.dt)
+head(premium2.dt)
+summary(premium2.dt)
+```
+
+# Question 2
+<b>There are many categorical variables with integer coded values (e.g. Diabetes, HighBloodPressure, Transplant…etc.) Is it necessary to convert them to factor datatype in R?</b>
+
+Yes, it is necessary to convert them into factor datatype in R. If we wrongly interpret the categorical variables as continuous variables, this allows for numeric concepts on continuous numbers such as fractions to become applicable. Taking the example of the `Gender` variable, a value of 0.5 would mean that the person is halfway male and female, which is not possible. Or for the `Allergy` variable, the interpretation would be that the person has half an allergy which makes no sense as well. 
+
+Hence, it is necessary to convert categorical variables with integer coded values into factor datatype in R. 
+
+# Question 3
+<b>Explore the data and report on your key findings.</b>
+
+### Variable Typing
+In this chunk, we reference Appendix A of `CBA Question Paper.pdf`. Appendix A provides a data dictionary that specifies what each of the features/variables in `premium2.csv` mean. We will alter the data table accordingly to match the description in Appendix A, such that we analyze each feature the way it is meant to be analyzed.
+
+``` {r variable_typing}
+# Age: Age of the client (years) 
+#       --> continuous variable, integer variable type, no change needed
+
+
+# Diabetes: Presence (1) or Absence (0) of the disease.
+#       --> unordered factor variable, integer variable type. turn it into a factor
+premium2.dt$Diabetes <- factor(premium2.dt$Diabetes, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$Diabetes <- factor(premium2.dt$Diabetes, levels = c(0, 1))
+
+
+# HighBloodPressure: Presence (1) or Absence (0) of the disease.
+#       --> unordered factor variable, integer variable type. turn it into a factor
+premium2.dt$HighBloodPressure <- factor(premium2.dt$HighBloodPressure, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$HighBloodPressure <- factor(premium2.dt$HighBloodPressure, levels = c(0, 1))
+
+
+# Transplant: Organ Transplant Surgery Ever Done (1: Yes, 0: No). 
+#       --> unordered factor variable, integer variable type. turn it into a factor
+premium2.dt$Transplant <- factor(premium2.dt$Transplant, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$Transplant <- factor(premium2.dt$Transplant, levels = c(0, 1))
+
+
+# ChronicDisease: Other Chronic Disease besides Diabetes or High Blood Pressure (1: Yes, 0: No). 
+#       --> unordered factor variable, integer variable type turn it into a factor
+premium2.dt$ChronicDisease <- factor(premium2.dt$ChronicDisease, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$ChronicDisease <- factor(premium2.dt$ChronicDisease, levels = c(0, 1))
+
+
+# Height: Height (cm). 
+#       --> continuous variable, integer variable type, no change needed
+
+
+# Weight: Weight (kg). 
+#       --> continuous variable, integer variable type, no change needed
+
+
+# Allergy: Known Allergy (1: Yes, 0: No). 
+#       --> unordered factor variable, integer variable type. turn it into a factor
+premium2.dt$Allergy <- factor(premium2.dt$Allergy, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$Allergy <- factor(premium2.dt$Allergy, levels = c(0, 1))
+
+
+# CancerInFamily: Does any family member had/have Cancer (1: Yes, 0: No).
+#       --> unordered factor variable, integer variable type turn it into a factor
+premium2.dt$CancerInFamily <- factor(premium2.dt$CancerInFamily, levels = c(0, 1), labels = c("No", "Yes"))
+# premium2.dt$CancerInFamily <- factor(premium2.dt$CancerInFamily, levels = c(0, 1))
+
+
+# NumMajorSurgeries: Number of Major Surgeries Done, excluding Organ Transplant.
+#       --> continuous variable, integer variable type
+#       --> however, while NumMajorSurgeries could theoretically take on any continuous integer value, it practically is limited to very few values because a human can only go through that many major surgeries. therefore, an argument can be made for this to be a factor variable
+#       --> particularly in this case, where NumMajorSurgeries only takes on integers 0,1,2,3, we should treat it as a factor variable
+premium2.dt$NumMajorSurgeries <- factor(premium2.dt$NumMajorSurgeries, levels = c(0, 1, 2, 3), labels = c(0, 1, 2, 3))
+# premium2.dt$NumMajorSurgeries <- factor(premium2.dt$NumMajorSurgeries, levels = c(0, 1, 2, 3))
+
+
+# Gender: (1: Male, 0: Female). 
+#       --> unordered factor variable, integer variable type turn it into a factor
+premium2.dt$Gender <- factor(premium2.dt$Gender, levels = c(0, 1), labels = c("Female", "Male"))
+# premium2.dt$Gender <- factor(premium2.dt$Gender, levels = c(0, 1))
+
+
+# Premium: Annual Premium Payable by client (Singapore Dollars)
+#       --> continuous variable, integer variable type, no change needed
+
+
+# BMI: continuous variable created in Question 1. It is a ratio
+#       --> continuous variable, double variable type, no change needed 
+
+
+# check data
+dim(premium2.dt)
+head(premium2.dt)
+summary(premium2.dt)
+```
+
+### Data Cleaning
+In this chunk, we will also perform a check for NA/missing data and resolve those, as well as impossible/illogical data from the data table such as negative age (if any). We make use of the summary table that was generated above. We may resolve outliers here if necessary.
+
+We note first, that for all factor variables, they indeed only possess the values of 0 and 1, hence there is no need to perform a check on those columns.
+
+``` {r data_cleaning}
+# check for missing data, such as NA etc
+any(is.na(premium2.dt)) 
+#       --> there are no missing data, all good!
+
+min(premium2.dt$Age)
+max(premium2.dt$Age)
+# check Age: min=18, max=66
+#       --> acceptable range
+
+min(premium2.dt$Height)
+max(premium2.dt$Height)
+# check Height: min=145, max=188
+#       --> acceptable range
+
+min(premium2.dt$Weight)
+max(premium2.dt$Weight)
+# check Weight: Weight=51, max=132
+#       --> take a look at those with very high weights, just to be sure
+checkWeight.dt <- premium2.dt %>%
+  filter(Weight >= 100)
+checkWeight.dt
+# turns out, there are 47 entries of people with Weight >= 100kg. This suggests that the maximum weight of 132kg is not an anomaly/outlier, and does not need to be removed
+#       --> acceptable range... if you can say 132kg is acceptable
+
+min(premium2.dt$Premium)
+max(premium2.dt$Premium)
+# check Premium: min=750, max=2000
+#       --> acceptable range
+
+min(premium2.dt$BMI)
+max(premium2.dt$BMI)
+# check BMI: min=15.2, max=50
+#       --> acceptable range, since we find the original range of values of Height and Weight to be acceptable 
+
+
+# check data
+dim(premium2.dt)
+head(premium2.dt)
+summary(premium2.dt)
+```
+
+### Data Exploration
+Now that we have cleaned the data (there were no changes made), we will begin to explore the data through Exploratory Data Analysis. We will make use of some plots to achieve this. Let's analyze feature by feature
+
+``` {r data_exploration_age}
+plot1 <- ggplot(data=premium2.dt, aes(Age)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=1)", x="Age", y="Count") +
+  scale_x_continuous(limits=c(10,70)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(Age)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=1)", x="Age", y="Density") +
+  scale_x_continuous(limits=c(10,70)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(Age)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=5)", x="Age", y="Count") +
+  scale_x_continuous(limits=c(10,70)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(Age)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=5)", x="Age", y="Density") +
+  scale_x_continuous(limits=c(10,70)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(Age)) + 
+  geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
+    labs(title="Boxplot", x="Age")
+
+plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+```
+
+
+
+``` {r data_exploration_height}
+plot1 <- ggplot(data=premium2.dt, aes(Height)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=1)", x="Height", y="Count") +
+  scale_x_continuous(limits=c(140,190)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(Height)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=1)", x="Height", y="Density") +
+  scale_x_continuous(limits=c(140,190)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(Height)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=5)", x="Height", y="Count") +
+  scale_x_continuous(limits=c(140,190)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(Height)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=5)", x="Height", y="Density") +
+  scale_x_continuous(limits=c(140,190)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(Height)) + 
+  geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
+    labs(title="Boxplot", x="Height")
+
+plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+```
+
+``` {r data_exploration_weight}
+plot1 <- ggplot(data=premium2.dt, aes(Weight)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=1)", x="Weight", y="Count") +
+  scale_x_continuous(limits=c(50,140)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(Weight)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=1)", x="Weight", y="Density") +
+  scale_x_continuous(limits=c(50,140)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(Weight)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=5)", x="Weight", y="Count") +
+  scale_x_continuous(limits=c(50,140)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(Weight)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=5)", x="Weight", y="Density") +
+  scale_x_continuous(limits=c(50,140)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(Weight)) + 
+  geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
+    labs(title="Boxplot", x="Weight")
+
+plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+```
+
+``` {r data_exploration_premium}
+plot1 <- ggplot(data=premium2.dt, aes(Premium)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=1)", x="Premium", y="Count") +
+  scale_x_continuous(limits=c(750,2000)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(Premium)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=1)", x="Premium", y="Density") +
+  scale_x_continuous(limits=c(750,2000)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(Premium)) + 
+  geom_histogram(binwidth = 50, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=50)", x="Premium", y="Count") +
+  scale_x_continuous(limits=c(750,2000)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(Premium)) + 
+  geom_histogram(binwidth = 50, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=50)", x="Premium", y="Density") +
+  scale_x_continuous(limits=c(750,2000)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(Premium)) + 
+  geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
+    labs(title="Boxplot", x="Premium")
+
+plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+
+```
+
+``` {r data_exploration_bmi}
+plot1 <- ggplot(data=premium2.dt, aes(BMI)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=1)", x="BMI", y="Count") +
+  scale_x_continuous(limits=c(15,50)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(BMI)) + 
+  geom_histogram(binwidth = 1, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=1)", x="BMI", y="Density") +
+  scale_x_continuous(limits=c(15,50)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(BMI)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue") + 
+  labs(title="Histogram (binwidth=5)", x="BMI", y="Count") +
+  scale_x_continuous(limits=c(15,50)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(BMI)) + 
+  geom_histogram(binwidth = 5, col="black", fill="lightblue", aes(y=..density..)) + 
+  geom_density(colour="red") + 
+  labs(title="Density plot (binwidth=5)", x="BMI", y="Density") +
+  scale_x_continuous(limits=c(15,50)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(BMI)) + 
+  geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
+  labs(title="Boxplot", x="BMI")
+
+plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+```
+
+``` {r data_exploration_factors}
+plot1 <- ggplot(data=premium2.dt, aes(Diabetes)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot2 <- ggplot(data=premium2.dt, aes(HighBloodPressure)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot3 <- ggplot(data=premium2.dt, aes(Transplant)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot4 <- ggplot(data=premium2.dt, aes(ChronicDisease)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(Allergy)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot6 <- ggplot(data=premium2.dt, aes(CancerInFamily)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot7 <- ggplot(data=premium2.dt, aes(NumMajorSurgeries)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+
+plot8 <- ggplot(data=premium2.dt, aes(Gender)) + 
+  geom_bar(col="black", fill="lightblue") + 
+  geom_text(stat='Count', aes(label=..count..), vjust=-0.5) + 
+  scale_y_continuous(limits=c(0,1000)) 
+  
+plot_grid(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, ncol=4)
+```
+
+
+``` {r data_exploration_test}
+plot1 <- ggplot(data=premium2.dt, aes(Age, Premium)) + 
+  geom_point(colour="black") 
+
+plot2 <- ggplot(data=premium2.dt, aes(Height, Premium)) + 
+  geom_point(colour="black") 
+
+plot3 <- ggplot(data=premium2.dt, aes(Weight, Premium)) + 
+  geom_point(colour="black") 
+
+plot_grid(plot1, plot2, plot3, ncol=2)
+
+
+
+plot4 <- ggplot(data=premium2.dt, aes(Diabetes, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot5 <- ggplot(data=premium2.dt, aes(HighBloodPressure, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot6 <- ggplot(data=premium2.dt, aes(Transplant, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot7 <- ggplot(data=premium2.dt, aes(ChronicDisease, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot8 <- ggplot(data=premium2.dt, aes(Allergy, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot9 <- ggplot(data=premium2.dt, aes(CancerInFamily, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot10 <- ggplot(data=premium2.dt, aes(NumMajorSurgeries, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot11 <- ggplot(data=premium2.dt, aes(Gender, Premium)) + 
+  geom_boxplot(colour="black", fill="lightblue") + 
+  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
+  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
+               aes( label=round(..y.., digits=1))) + 
+  scale_y_continuous(limits=c(0,2000)) 
+
+plot_grid(plot4, plot5, plot6, plot7, ncol=2)
+plot_grid(plot8, plot9, plot10, plot11, ncol=2)
+
+```
