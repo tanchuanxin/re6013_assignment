@@ -10,13 +10,24 @@ In this chunk, we will set up the R libraries necessary for this assignment. Als
 
 ```{r setup, include=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
-library(data.table)
-library(tidyverse)
-library(ggplot2)
-library(cowplot)
+library(knitr) # for rmarkdown
+library(data.table) # for data tables
+library(tidyverse) # for data manipulation
+library(ggplot2) # for visualization
+library(corrplot) # for correlation plot
+library(cowplot) # for stitching graphs
+library(caTools) # for train-test split
+library(rpart) # for cart
+library(rpart.plot) # for plotting cart
+library(car) # for vif
+library(caret) # for linreg cv
 
 # set your working directory here
 setwd("C:/Users/user/Documents/Github/re6013_assignment") # chuanxin's wd
+
+# set a seed so that random things are repeatable
+set.seed(2021)
+
 ```
 
 ``` {r read data}
@@ -42,7 +53,8 @@ The formula is therefore `BMI = Weight / (Height/100)^2`. We will keep BMI as a 
 ``` {r question_1}
 # create the BMI variable
 premium2.dt$BMI <- round(premium2.dt$Weight / ((premium2.dt$Height/100)^2), 1)
-
+head(premium2.dt$BMI)
+summary(premium2.dt$BMI)
 
 # check data
 dim(premium2.dt)
@@ -53,7 +65,9 @@ summary(premium2.dt)
 # Question 2
 <b>There are many categorical variables with integer coded values (e.g. Diabetes, HighBloodPressure, Transplant…etc.) Is it necessary to convert them to factor datatype in R?</b>
 
-Yes, it is necessary to convert them into factor datatype in R. If we wrongly interpret the categorical variables as continuous variables, this allows for numeric concepts on continuous numbers such as fractions to become applicable. Taking the example of the `Gender` variable, a value of 0.5 would mean that the person is halfway male and female, which is not possible. Or for the `Allergy` variable, the interpretation would be that the person has half an allergy which makes no sense as well. 
+Yes, it is necessary to convert them into factor datatype in R. If we wrongly interpret the categorical variables as continuous variables, this allows for numeric concepts on continuous numbers such as fractions to become applicable. 
+
+Taking the example of the `Gender` variable, a value of 0.5 would mean that the person is halfway male and female, which is not possible. Or for the `Allergy` variable, the interpretation would be that the person has half an allergy which makes no sense as well. 
 
 Hence, it is necessary to convert categorical variables with integer coded values into factor datatype in R. 
 
@@ -190,6 +204,16 @@ summary(premium2.dt)
 ### Data Exploration
 Now that we have cleaned the data (there were no changes made), we will begin to explore the data through Exploratory Data Analysis. We will make use of some plots to achieve this. Let's analyze feature by feature
 
+``` {r data_exploration_correlation}
+premium2.dt.continuous <- subset(premium2.dt, select=c(Premium, Age, Height, Weight, BMI))
+
+corrplot(cor(premium2.dt.continuous), method="number")
+```
+<br><b>Findings</b><br>
+There is high correlation between Age and Premium, suggesting that Age could be one of the most important predictors for Premium within the continuous variables. 
+
+BMI has high correlation with Weight and moderately high correlation with Height, which could result in BMI being removed in the models subsequently. This makes sense - BMI was derived from Height and Weight
+
 ``` {r data_exploration_age}
 plot1 <- ggplot(data=premium2.dt, aes(Age)) + 
   geom_histogram(binwidth = 1, col="black", fill="lightblue") + 
@@ -217,11 +241,11 @@ plot5 <- ggplot(data=premium2.dt, aes(Age)) +
   geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
     labs(title="Boxplot", x="Age")
 
-plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
-plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+plot6 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot6, plot5, ncol=1, rel_heights = c(5,2))
 ```
-
-
+<br><b>Findings</b><br>
+There is a rather even distribution of age through the dataset. The only thing interesting to see is that there are slightly more people just over 40 who have bought insurance.
 
 ``` {r data_exploration_height}
 plot1 <- ggplot(data=premium2.dt, aes(Height)) + 
@@ -250,9 +274,11 @@ plot5 <- ggplot(data=premium2.dt, aes(Height)) +
   geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
     labs(title="Boxplot", x="Height")
 
-plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
-plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+plot6 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot6, plot5, ncol=1, rel_heights = c(5,2))
 ```
+<br><b>Findings</b><br>
+Most of the population have a height between 160cm to 175cm 
 
 ``` {r data_exploration_weight}
 plot1 <- ggplot(data=premium2.dt, aes(Weight)) + 
@@ -281,9 +307,11 @@ plot5 <- ggplot(data=premium2.dt, aes(Weight)) +
   geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
     labs(title="Boxplot", x="Weight")
 
-plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
-plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+plot6 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot6, plot5, ncol=1, rel_heights = c(5,2))
 ```
+<br><b>Findings</b><br>
+Most of the population has a weight around 75kg, but there is a significant number of outliers that are in the 120kg range (which is concerning)
 
 ``` {r data_exploration_premium}
 plot1 <- ggplot(data=premium2.dt, aes(Premium)) + 
@@ -312,10 +340,14 @@ plot5 <- ggplot(data=premium2.dt, aes(Premium)) +
   geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
     labs(title="Boxplot", x="Premium")
 
-plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
-plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+plot6 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot6, plot5, ncol=1, rel_heights = c(5,2))
+
+uniqueN(premium2.dt$Premium)
 
 ```
+<br><b>Findings</b><br>
+Most of the population have a premium between \$1100 to \$1400, but the majority has a premium of around \$1150. However we can also note that the Premium variable takes only several distinct values (24 unique ones) between the range of 750-2000. 
 
 ``` {r data_exploration_bmi}
 plot1 <- ggplot(data=premium2.dt, aes(BMI)) + 
@@ -344,9 +376,11 @@ plot5 <- ggplot(data=premium2.dt, aes(BMI)) +
   geom_boxplot(col="black", fill="lightblue", outlier.shape=4) + 
   labs(title="Boxplot", x="BMI")
 
-plot1_4 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
-plot_grid(plot1_4, plot5, ncol=1, rel_heights = c(5,2))
+plot6 <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(plot6, plot5, ncol=1, rel_heights = c(5,2))
 ```
+<br><b>Findings</b><br>
+Most of the population has a BMI between 25 to 30. According to the CDC, this means most of the population is overweight. There are also several outliers who are obese
 
 ``` {r data_exploration_factors}
 plot1 <- ggplot(data=premium2.dt, aes(Diabetes)) + 
@@ -391,79 +425,366 @@ plot8 <- ggplot(data=premium2.dt, aes(Gender)) +
   
 plot_grid(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, ncol=4)
 ```
+<br><b>Findings</b><br>
+Simply a count plot. 
 
+### Data exploration against Premium
+It is possible to do a pairwise plot for every single variable against every other variable. However, since we have 13 variables, this will lead to (13^2-13)/2 = 78 different graphs to analyze, which is too much.
 
-``` {r data_exploration_test}
+Therefore, we will limit our exploration to just independent variables vs dependent variable. That is, all variables plotted against the dependent variable of Premium. This will result in only 12 plots to analyze
+
+``` {r data_exploration_two_variable}
+# scatterplots for continuous variables
 plot1 <- ggplot(data=premium2.dt, aes(Age, Premium)) + 
-  geom_point(colour="black") 
+  geom_point(colour="black") +
+  geom_smooth(method='lm', formula= y~x)
+
 
 plot2 <- ggplot(data=premium2.dt, aes(Height, Premium)) + 
-  geom_point(colour="black") 
+  geom_point(colour="black") +
+  geom_smooth(method='lm', formula= y~x)
 
 plot3 <- ggplot(data=premium2.dt, aes(Weight, Premium)) + 
-  geom_point(colour="black") 
+  geom_point(colour="black") +
+  geom_smooth(method='lm', formula= y~x)
 
-plot_grid(plot1, plot2, plot3, ncol=2)
+plot4 <- ggplot(data=premium2.dt, aes(BMI, Premium)) + 
+  geom_point(colour="black") +
+  geom_smooth(method='lm', formula= y~x)
+
+title <- ggdraw() + 
+  draw_label("Line of best fit: blue", x = 0, hjust = 0) +
+  theme(plot.margin = margin(0, 0, 0, 7))  
+
+plot_row <- plot_grid(plot1, plot2, plot3, plot4, ncol=2)
+plot_grid(title, plot_row, ncol = 1, rel_heights = c(0.1, 1))
 
 
-
-plot4 <- ggplot(data=premium2.dt, aes(Diabetes, Premium)) + 
+# boxplots for factor variables
+plot5 <- ggplot(data=premium2.dt, aes(Diabetes, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot5 <- ggplot(data=premium2.dt, aes(HighBloodPressure, Premium)) + 
+plot6 <- ggplot(data=premium2.dt, aes(HighBloodPressure, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot6 <- ggplot(data=premium2.dt, aes(Transplant, Premium)) + 
+plot7 <- ggplot(data=premium2.dt, aes(Transplant, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot7 <- ggplot(data=premium2.dt, aes(ChronicDisease, Premium)) + 
+plot8 <- ggplot(data=premium2.dt, aes(ChronicDisease, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot8 <- ggplot(data=premium2.dt, aes(Allergy, Premium)) + 
+plot9 <- ggplot(data=premium2.dt, aes(Allergy, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot9 <- ggplot(data=premium2.dt, aes(CancerInFamily, Premium)) + 
+plot10 <- ggplot(data=premium2.dt, aes(CancerInFamily, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot10 <- ggplot(data=premium2.dt, aes(NumMajorSurgeries, Premium)) + 
+plot11 <- ggplot(data=premium2.dt, aes(NumMajorSurgeries, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)), size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
 
-plot11 <- ggplot(data=premium2.dt, aes(Gender, Premium)) + 
+plot12 <- ggplot(data=premium2.dt, aes(Gender, Premium)) + 
   geom_boxplot(colour="black", fill="lightblue") + 
-  stat_summary(fun.y=mean, colour="darkred", geom="point", size=1, show_guide = FALSE) +
-  stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.1, hjust=-0.1, 
-               aes( label=round(..y.., digits=1))) + 
-  scale_y_continuous(limits=c(0,2000)) 
+  stat_summary(fun=mean, colour="darkgreen", geom="point", size=3, shape=4) +
+  stat_summary(fun=mean, colour="darkgreen", geom="text", vjust=-0.2, 
+               hjust=1.2, aes( label=round(..y.., digits=1)),size=3) + 
+  stat_summary(fun=median, colour="darkred", geom="point", size=3, shape=1) +
+  stat_summary(fun=median, colour="darkred", geom="text", vjust=-0.2,
+               hjust=-0.3, aes( label=round(..y.., digits=1)), size=3) 
+  
 
-plot_grid(plot4, plot5, plot6, plot7, ncol=2)
-plot_grid(plot8, plot9, plot10, plot11, ncol=2)
+title <- ggdraw() + 
+  draw_label("Mean: green    ||    Median: red", x = 0, hjust = 0) +
+  theme(plot.margin = margin(0, 0, 0, 7))  
+  
+plot_row <- plot_grid(plot5, plot6, plot7, plot8, ncol=2) 
+plot_grid(title, plot_row, ncol = 1, rel_heights = c(0.1, 1))
 
+plot_row <- plot_grid(plot9, plot10, plot11, plot12, ncol=2)
+plot_grid(title, plot_row, ncol = 1, rel_heights = c(0.1, 1))
+
+```
+
+<br><b>Findings</b><br>
+
+* Age
+  * The older you are, the higher the premium tends to be 
+  * Likely an important variable
+* Height
+  * There is very little observable relationship between height and premium
+* Weight
+  * The heavier you are, the higher the premium tends to be
+  * Likely an important variable
+* BMI
+  * The higher the BMI, the higher the premium tends to be
+  * Likely an important variable
+* Diabetes
+  * Having diabetes means that premium will generally be higher. However, the distribution remains similar
+  * Likely an important variable
+* HighBloodPressure
+  * Having high blood pressure means that premium will almost certainly be higher. Almost all high blood pressure persons will pay a premium above the mean/median of someone without high blood pressure
+  * Likely an important variable
+* Transplant
+  * Having had transplants before means that premium will almost certainly be higher. Almost all persons with a history of transplants will pay a premium above the 75 percentile of someone without transplants
+  * Likely an important variable
+* ChronicDisease
+  * Having chronic disease means that premium will almost certainly be higher. Almost all persons with chronic disease will pay a premium above the mean/median of someone without chronic disease
+  * Likely an important variable
+* Allergy
+  * Allergies do not seem to affect premium
+* CancerInFamily
+  * Having cancer in family members means that premium will generally be higher based on mean and median premiums
+  * Likely an important variable
+* NumMajorSurgeries
+  * The more the number of major surgeries, the higher the premium will be. However there is almost no difference between having 2 major surgeries, and having 3. However, this could be because of a lack of data.
+  * Likely an important variable
+* Gender
+  * Gender does not affect premium too much
+  
+  
+  
+# Question 4
+Using 1 SE optimal CART and one other technique learnt in this course: 
+a. What is the 10-fold cross validation RMSE and number of splits in the 1SE Optimal CART? 
+b. Identify the key predictors of premium. 
+c. Is BMI or Gender important in determining premium? 
+d. Evaluate and compare the predictive accuracy of the two techniques on a 70-30 train-test split. Present testset RMSE results in a table
+
+The other technique that we shall employ will be linear regression. We shall answer the questions 4a using linear regression
+
+### CART
+We shall follow the procedure outlined in the lecture notes for CART in RE6013. It should be noted that CART is immune to issues of multicollinearity, hence BMI variable does not need to be removed beforehand
+
+``` {r cart_maximum}
+# create the cart model that will grow a maximum tree. use the trainset as the data
+cart1 <- rpart(Premium ~ ., data = premium2.dt, method = 'anova', control = rpart.control(minsplit = 2, cp = 0))
+
+# check the cp values to select the minimum cp value
+printcp(cart1, digits = 3)
+plotcp(cart1)
+
+# min cp + 1 stddev
+CVerror.cap <- cart1$cptable[which.min(cart1$cptable[,"xerror"]), "xerror"] +  cart1$cptable[which.min(cart1$cptable[,"xerror"]), "xstd"]
+
+# Find the optimal CP region whose CV error is just below CVerror.cap in maximal tree cart1.
+i <- 1; j<- 4
+while (cart1$cptable[i,j] > CVerror.cap) {
+  i <- i + 1
+}
+cp1 = ifelse(i > 1, sqrt(cart1$cptable[i,1] * cart1$cptable[i-1,1]), 1)
+```
+
+``` {r cart_optimal}
+# create the next cart model, which is the optimal tree
+cart2 <- prune(cart1, cp = cp1)
+printcp(cart2, digits = 3)
+plotcp(cart2)
+
+# plot the optimal tree
+rpart.plot(cart2, nn = T, main = "Optimal Tree")
+## The number inside each node represent the mean value of Y.
+
+# check the variable importance
+cart2$variable.importance
+summary(cart2)
+
+# calculate errors from inspecting the printcp table
+cart2_root_node_error <- 97526 # copy from cp table
+cart2_xerror <- 0.268 # take the very last value of xerror from cp table
+cart2_cv_rmse <- sqrt(cart2_xerror * cart2_root_node_error)
+cart2_cv_rmse
+```
+
+### Linreg
+
+We shall follow the procedure outlined in the lecture notes for linear regression in RE6013
+
+``` {r linreg_vif}
+# create a linear regression model on trainset, with all the variables
+linreg1 <- lm(Premium ~ ., data = premium2.dt)
+summary(linreg1)
+vif(linreg1)
+# we can observe that the GVIF value of BMI is extremely high. this is to be expected because BMI is derived from Height and Weight, therefore multicollinearity is bound to be high. we should be removing BMI from our analysis since it has the highest GVIF=87 > 2
+
+# remove BMI which has the highest GVIF 
+linreg2 <- lm(Premium ~ .-BMI, data = premium2.dt)
+summary(linreg2)
+vif(linreg2)
+# now, all GVIF values are <2 so we will not encounter multicollinearity anymore
+# we also observe that there are 6 variables that are show a relatively high level of statistical significance - Age, Transplant, ChronicDisease, CancerInFamily, Weight, NumMajorSurgeries
+```
+
+``` {r linreg_optimal}
+# perform a stepwise search for the optimal linear regression model 
+linreg3 <- step(linreg2)
+summary(linreg3)
+vif(linreg3)
+
+
+# now that we know the optimal linear regression model, we put it through 10-fold cross validation, same as CART
+# specify the 10-fold cross validation 
+train.control <- trainControl(method = "cv", number = 10)
+linreg4 <- train(Premium ~ Age + Transplant + ChronicDisease + Weight + CancerInFamily + NumMajorSurgeries,
+               data = premium2.dt, method = "lm", trControl = train.control)
+summary(linreg4)
+# vif(linreg4) # does not work with this library, but not necessary to know this at this stage anyway
+print(linreg4)
+
+# cross validation rmse given in the print(linreg4) statement
+linreg4_cv_rmse <- 186.655
+linreg4_cv_rmse
+
+```
+
+
+
+
+  
+### Train-Test split
+This will create a train-test split of the data that we have
+
+``` {r train_test_split}
+# perform the train-test split based on 70-30 rule
+train <- sample.split(Y = premium2.dt$Premium, SplitRatio = 0.7)
+trainset <- subset(premium2.dt, train == T)
+testset <- subset(premium2.dt, train == F)
+
+# check and ensure that both trainset and testset are still similar in distribution 
+summary(trainset)
+summary(testset)
+
+```
+
+We need to retrain the cart model only on training data, then predict
+``` {r cart_train_test}
+# ================= Repeating earlier code for train-test =================
+
+# create the cart model that will grow a maximum tree. use the trainset as the data
+cart3 <- rpart(Premium ~ ., data = trainset, method = 'anova', control = rpart.control(minsplit = 2, cp = 0))
+
+# check the cp values to select the minimum cp value
+printcp(cart3, digits = 3)
+plotcp(cart3)
+
+# min cp + 1 stddev
+CVerror.cap <- cart3$cptable[which.min(cart3$cptable[,"xerror"]), "xerror"] +  cart3$cptable[which.min(cart3$cptable[,"xerror"]), "xstd"]
+
+# Find the optimal CP region whose CV error is just below CVerror.cap in maximal tree cart3.
+i <- 1; j<- 4
+while (cart3$cptable[i,j] > CVerror.cap) {
+  i <- i + 1
+}
+cp3 = ifelse(i > 1, sqrt(cart3$cptable[i,1] * cart3$cptable[i-1,1]), 1)
+
+# create the next cart model, which is the optimal tree
+cart4 <- prune(cart3, cp = cp3)
+printcp(cart4, digits = 3)
+plotcp(cart4)
+
+# Root node error: 67783119/691 = 98094
+# cart4 trainset MSE = 0.264 * 98094 = 
+# cart4 CV MSE = 0.320 * 98094 = 
+
+# plot the optimal tree
+rpart.plot(cart4, nn = T, main = "Optimal Tree")
+## The number inside each node represent the mean value of Y.
+
+# check the variable importance
+cart4$variable.importance
+summary(cart4)
+
+# =========================================================================
+```
+
+``` {r cart_predict}
+# predict on the testset
+cart_predict <- predict(cart4, newdata = testset)
+
+# calculating rmse
+cart_error <- testset$Premium - cart_predict
+cart_square_error <- cart_error^2
+cart_mean_square_error <- mean(cart_square_error)
+cart_root_mean_square_error <- sqrt(cart_mean_square_error)
+
+summary(abs(cart_error))
+cart_root_mean_square_error
+```
+
+We need to retrain the linreg model only on training data, then predict
+
+``` {r linreg_train_test}
+# ================= Repeating earlier code for train-test =================
+
+# now that we know the optimal linear regression model, we put it through 10-fold cross validation, same as CART
+# specify the 10-fold cross validation 
+train.control <- trainControl(method = "cv", number = 10)
+linreg5 <- train(Premium ~ Age + Transplant + ChronicDisease + Weight + CancerInFamily + NumMajorSurgeries,
+               data = trainset, method = "lm", trControl = train.control)
+summary(linreg5)
+# vif(linreg5) # does not work with this library, but not necessary to know this at this stage anyway
+print(linreg5)
+
+# =========================================================================
+```
+
+``` {r linreg_predict}
+# predict on the testset 
+linreg_predict <- predict(linreg5, newdata = testset)
+
+# calculating rmse
+linreg_error <- testset$Premium - linreg_predict
+linreg_square_error <- linreg_error^2
+linreg_mean_square_error <- mean(linreg_square_error)
+linreg_root_mean_square_error <- sqrt(linreg_mean_square_error)
+
+summary(abs(linreg_error))
+linreg_root_mean_square_error
+```
+
+
+``` {r q4d}
+uniqueN(testset$Premium)
+uniqueN(cart_predict)
+uniqueN(linreg_predict)
 ```
