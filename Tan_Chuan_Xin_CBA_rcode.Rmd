@@ -584,7 +584,7 @@ plot_grid(title, plot_row, ncol = 1, rel_heights = c(0.1, 1))
   
   
   
-# Question 4
+
 Using 1 SE optimal CART and one other technique learnt in this course: 
 a. What is the 10-fold cross validation RMSE and number of splits in the 1SE Optimal CART? 
 b. Identify the key predictors of premium. 
@@ -723,8 +723,8 @@ printcp(cart4, digits = 3)
 plotcp(cart4)
 
 # Root node error: 67783119/691 = 98094
-# cart4 trainset MSE = 0.264 * 98094 = 
-# cart4 CV MSE = 0.320 * 98094 = 
+# cart4 trainset MSE = 0.276 * 98094 = 27074
+# cart4 CV MSE = 0.306 * 98094 = 30017
 
 # plot the optimal tree
 rpart.plot(cart4, nn = T, main = "Optimal Tree")
@@ -788,3 +788,12 @@ uniqueN(testset$Premium)
 uniqueN(cart_predict)
 uniqueN(linreg_predict)
 ```
+
+
+# Question 5
+Explain the limitations of your analysis. [Max 1 page.]
+
+
+
+# Question 6
+Is CART successful in this application? Explain. [Max 1 page.]
